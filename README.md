@@ -27,7 +27,7 @@ A robust string-based mathematical formula evaluator that supports basic arithme
 ### Basic Example
 
 ```csharp
-using Nlc.Core;
+using Core;
 
 var evaluator = new FormulaEvaluator();
 
@@ -217,7 +217,7 @@ dotnet test
 ### Run Demo
 
 ```bash
-cd Nlc.Core
+cd Core
 dotnet run
 ```
 
