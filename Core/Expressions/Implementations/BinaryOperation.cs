@@ -6,6 +6,9 @@ public abstract class BinaryOperation : ExpressionBase
 
     protected BinaryOperation(string input)
     {
+        // Extract keyword for validation error messages
+        var keyword = StringParser.ExtractKeyword(input);
+
         // Extract content between parentheses
         var content = StringParser.ExtractParametersContent(input);
 
@@ -13,10 +16,10 @@ public abstract class BinaryOperation : ExpressionBase
         var parameters = StringParser.SplitParameters(content);
 
         // Validate parameter count
-        StringParser.ValidateParameterCount(this.Keyword!, 2, parameters.Count);
+        StringParser.ValidateParameterCount(keyword, GetExpectedParameterCount(Type), parameters.Count);
 
         // Recursively build child expressions
-        Parameter1 = ExpressionBase.Build(parameters[0]);
-        Parameter2 = ExpressionBase.Build(parameters[1]);
+        Parameter1 = Build(parameters[0]);
+        Parameter2 = Build(parameters[1]);
     }
 }

@@ -1,10 +1,9 @@
 namespace Core.Expressions.Implementations;
 
+[ExpressionKeyword("add")]
 public class AddOperation : BinaryOperation
 {
     public AddOperation(string input) : base(input) { }
-
-    public override string Keyword => "add";
 
     public override double Resolve()
     {

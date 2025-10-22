@@ -1,5 +1,5 @@
+using System.Linq.Expressions;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using Core.Exceptions;
 using Core.Expressions.Implementations;
 
@@ -11,10 +11,8 @@ public abstract class ExpressionBase
     protected ExpressionBase Parameter2 { get; set; } = null!;
     protected ExpressionBase Parameter3 { get; set; } = null!;
 
-    private static readonly Dictionary<string, Type> _expressionTypes;
-    private static readonly Regex _numberRegex = new Regex(@"^-?\d+(\.\d+)?$");
+    private static readonly Dictionary<string, Func<string, ExpressionBase>> _expressionFactories;
 
-    public abstract string? Keyword { get; }
     public abstract double Resolve();
     public abstract OperationType Type { get; }
 
@@ -28,23 +26,23 @@ public abstract class ExpressionBase
 
         input = input.Trim();
 
-        // Check if it's a number
-        if (_numberRegex.IsMatch(input))
+        // Check if it's a number - let NumberPrimitive handle validation
+        if (double.TryParse(input, out _))
             return new NumberPrimitive(input);
 
         // Extract keyword
         var keyword = StringParser.ExtractKeyword(input);
 
         // Validate keyword exists
-        if (!_expressionTypes.ContainsKey(keyword))
+        if (!_expressionFactories.ContainsKey(keyword))
             throw new UnknownFunctionException(keyword);
 
-        var expressionType = _expressionTypes[keyword];
+        // Use compiled factory delegate for fast instantiation
+        var factory = _expressionFactories[keyword];
 
-        // Create instance with input string
         try
         {
-            return (ExpressionBase)Activator.CreateInstance(expressionType, input)!;
+            return factory(input);
         }
         catch (TargetInvocationException ex) when (ex.InnerException != null)
         {
@@ -55,11 +53,11 @@ public abstract class ExpressionBase
 
     /// <summary>
     /// Static constructor - uses reflection to discover all expression implementations
-    /// Thread-safe initialization guaranteed by CLR
+    /// and compile fast factory delegates. Thread-safe initialization guaranteed by CLR.
     /// </summary>
     static ExpressionBase()
     {
-        _expressionTypes = new Dictionary<string, Type>();
+        _expressionFactories = new Dictionary<string, Func<string, ExpressionBase>>();
 
         var assembly = typeof(ExpressionBase).Assembly;
         var expressionTypes = assembly.GetTypes()
@@ -69,38 +67,32 @@ public abstract class ExpressionBase
         {
             try
             {
-                // Create a temporary instance to get the keyword
-                // We need to handle the fact that constructors now expect a string
-                var constructor = type.GetConstructor(new[] { typeof(string) });
-                if (constructor != null)
-                {
-                    // Use a dummy valid expression to get the keyword
-                    var dummyInput = GetDummyInputForType(type);
-                    var instance = (ExpressionBase)constructor.Invoke(new object[] { dummyInput });
+                // Get keyword from attribute instead of instantiating
+                var attribute = type.GetCustomAttribute<ExpressionKeywordAttribute>();
+                if (attribute == null)
+                    continue;
 
-                    if (instance.Keyword != null)
-                    {
-                        _expressionTypes[instance.Keyword] = type;
-                    }
-                }
+                var keyword = attribute.Keyword;
+
+                // Create compiled factory delegate for fast instantiation
+                var constructor = type.GetConstructor(new[] { typeof(string) });
+                if (constructor == null)
+                    continue;
+
+                // Build expression: (string input) => new TExpression(input)
+                var inputParam = Expression.Parameter(typeof(string), "input");
+                var newExpr = Expression.New(constructor, inputParam);
+                var castExpr = Expression.Convert(newExpr, typeof(ExpressionBase));
+                var lambda = Expression.Lambda<Func<string, ExpressionBase>>(castExpr, inputParam);
+
+                // Compile to delegate - much faster than Activator.CreateInstance
+                _expressionFactories[keyword] = lambda.Compile();
             }
             catch
             {
-                // Skip types that can't be instantiated
+                // Skip types that can't be processed
             }
         }
-    }
-
-    private static string GetDummyInputForType(Type type)
-    {
-        // Get the keyword from a static property if available, otherwise use reflection on the property
-        var keywordProperty = type.GetProperty("Keyword");
-        if (keywordProperty != null)
-        {
-            // For binary operations, we need a valid dummy expression
-            return "dummy(0, 0)";
-        }
-        return "0";
     }
 
     protected static int GetExpectedParameterCount(OperationType type)

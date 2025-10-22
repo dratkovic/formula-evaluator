@@ -1,10 +1,9 @@
 namespace Core.Expressions.Implementations;
 
+[ExpressionKeyword("subtract")]
 public class SubtractOperation : BinaryOperation
 {
     public SubtractOperation(string input) : base(input) { }
-
-    public override string Keyword => "subtract";
 
     public override double Resolve()
     {

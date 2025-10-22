@@ -1,10 +1,9 @@
 namespace Core.Expressions.Implementations;
 
+[ExpressionKeyword("multiply")]
 public class MultiplyOperation : BinaryOperation
 {
     public MultiplyOperation(string input) : base(input) { }
-
-    public override string Keyword => "multiply";
 
     public override double Resolve()
     {

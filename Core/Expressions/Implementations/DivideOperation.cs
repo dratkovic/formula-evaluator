@@ -1,10 +1,9 @@
 namespace Core.Expressions.Implementations;
 
+[ExpressionKeyword("divide")]
 public class DivideOperation : BinaryOperation
 {
     public DivideOperation(string input) : base(input) { }
-
-    public override string Keyword => "divide";
 
     public override double Resolve()
     {
